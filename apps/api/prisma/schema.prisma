@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Merchant {
+  id         String    @id @default(uuid())
+  name       String
+  apiKeyHash String    @unique
+  webhookUrl String?
+  createdAt  DateTime  @default(now())
+  payments   Payment[]
+}
+
+model Payment {
+  id             String           @id @default(uuid())
+  merchantId     String
+  merchant       Merchant         @relation(fields: [merchantId], references: [id])
+  orderRef       String
+  amount         Int // in paise, never float
+  currency       String           @default("INR")
+  status         String           @default("CREATED") // CREATED, PENDING, SUCCESS, FAILED, REFUNDED
+  gateway        String?
+  gatewayOrderId String?
+  idempotencyKey String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  attempts       PaymentAttempt[]
+  refunds        Refund[]
+
+  @@unique([merchantId, idempotencyKey])
+}
+
+model PaymentAttempt {
+  id        String   @id @default(uuid())
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id])
+  gateway   String
+  status    String
+  errorCode String?
+  latencyMs Int?
+  createdAt DateTime @default(now())
+}
+
+model WebhookEvent {
+  id          String    @id @default(uuid())
+  gateway     String
+  eventId     String
+  payload     Json
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([gateway, eventId])
+}
+
+model Refund {
+  id        String   @id @default(uuid())
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id])
+  amount    Int
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+}
